@@ -15,6 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+#The main program executed by the LilyGO controllers, in case their controlled nodes are Raspberry Pis (the UART serial protocol, in our
+#architecture, is only used between LilyGO-RP). It accesses the UART channel to gather the metrics to be sent via AlLoRa, when the
+#corresponding Gateway asks for it.
+
 import time, gc, json, machine, esp32, sys
 from AlLoRa.Nodes.Source import Source
 from AlLoRa.File import CTP_File
@@ -25,29 +29,29 @@ from machine import UART, Pin
 
 gc.enable()
 
-# UART en lugar de I2C
+# UART instead of I2C
 uart = UART(1, baudrate=115200, tx=Pin(41), rx=Pin(42), timeout=50)
 
 def request_metrics():
     """
-    Envía 0x01 por UART para pedir métricas y espera una trama:
+    Sends 0x01 via UART to request metrics and expects a response with the following format:
     [0xAA][len_L][len_H][payload...]
     """
     try:
-        # Limpiar posibles restos en RX para empezar sincronizados
+        #We consume all posible remnants of data in the UART channel to guarantee a clean start of the operation
         while uart.any():
             uart.read()
 
-        # Pedir métricas al nodo controlado
+        # We ask the controlled node for metrics
         uart.write(b'\x01')
 
-        # Dar un pequeño margen para que prepare la respuesta
+        # Some small margin is given for the controlled node to prepare its answer
         time.sleep_ms(30)
 
         deadline = time.ticks_add(time.ticks_ms(), 500)
 
         while time.ticks_diff(deadline, time.ticks_ms()) > 0:
-            # Buscar byte de sincronización 0xAA
+            # We look for the 0xAA synchronization byte
             first = uart.read(1)
             if not first:
                 time.sleep_ms(5)
@@ -56,7 +60,7 @@ def request_metrics():
             if first[0] != 0xAA:
                 continue
 
-            # Leer los 2 bytes restantes de cabecera (longitud)
+            # We read the 2 remaining bytes of the header (length)
             header_rest = b""
             while len(header_rest) < 2 and time.ticks_diff(deadline, time.ticks_ms()) > 0:
                 chunk = uart.read(2 - len(header_rest))
@@ -66,16 +70,16 @@ def request_metrics():
                     time.sleep_ms(5)
 
             if len(header_rest) < 2:
-                print("Cabecera incompleta")
+                print("Incomplete header")
                 return None
 
             length = header_rest[0] | (header_rest[1] << 8)
 
             if length <= 0 or length > 512:
-                print("Longitud inválida:", length)
+                print("Invalid length:", length)
                 continue
 
-            # Leer payload completo
+            # We read the complete payload
             payload = b""
             payload_deadline = time.ticks_add(time.ticks_ms(), 500)
 
@@ -87,16 +91,16 @@ def request_metrics():
                     time.sleep_ms(5)
 
             if len(payload) != length:
-                print("Payload incompleto")
+                print("Incomplete payload")
                 continue
 
             return payload.decode()
 
-        print("Timeout esperando trama UART")
+        print("Timeout while awaiting for UART frame")
         return None
 
     except Exception as e:
-        print("Error UART:", e)
+        print("UART Error:", e)
         return None
 
 def clean_timing_file():
@@ -129,11 +133,11 @@ try:
                 data = request_metrics()
 
                 if not data:
-                    print("[SRC] No se recibieron métricas válidas")
+                    print("[SRC] Valid metrics were not received")
                     time.sleep(1)
                     continue
 
-                print("Métricas obtenidas por UART:", data)
+                print("Metrics obtained via UART:", data)
 
                 file = CTP_File(
                     name="Envio_metricas",
@@ -142,12 +146,12 @@ try:
                 )
                 lora_node.set_file(file)
 
-                print("[SRC] Enviando métricas...")
+                print("[SRC] Sending metrics...")
                 lora_node.send_file()
-                print("[SRC] Métricas enviadas correctamente")
+                print("[SRC] Metrics sent correctly")
 
         except Exception as e:
-            print("[SRC] Error al enviar métricas:", repr(e))
+            print("[SRC] Error while sending metrics:", repr(e))
             sys.print_exception(e)
             gc.collect()
 

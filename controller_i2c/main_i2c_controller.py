@@ -15,6 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+#The main program executed by the LilyGO controllers, in case their controlled nodes are also LilyGOs (the I2C serial protocol, in our
+#architecture, is only used between LilyGO-LilyGO). It reads the I2C channel to gather the metrics to be sent via AlLoRa, when the
+#corresponding Gateway asks for it.
+
 import time, gc, json, machine, esp32, sys
 from AlLoRa.Nodes.Source import Source
 from AlLoRa.File import CTP_File
@@ -39,17 +43,23 @@ def request_metrics():
     
     time.sleep_ms(50) # dar tiempo al esclavo a preparar la respuesta 
     '''
+
+    """
+        Format of the response that is expected:
+        [0xAA][len_L][len_H][payload...]
+    """
+
     try:
         raw = i2c.readfrom(SLAVE_ADDR, 128)
 
         if raw[0] != 0xAA:
-            print("Frame desincronizado")
+            print("Desynchronized frame")
             return None
 
         length = raw[1] | (raw[2] << 8)
 
         if length <= 0 or length > 120:
-            print("Longitud inválida:", length)
+            print("Invalid length:", length)
             return None
 
         payload = raw[3:3+length]
@@ -92,23 +102,23 @@ try:
                 data = request_metrics()
 
                 if not data:
-                    print("[SRC] No se recibieron métricas válidas")
+                    print("[SRC] Valid metrics were not received")
                     time.sleep(1)
                     continue
 
-                print("Métricas obtenidas por I2C:", data)
+                print("Metrics obtained via I2C:", data)
 
                 file = CTP_File(name="Envio_metricas",
                                 content=bytearray(data, 'utf-8'),
                                 chunk_size=chunk_size)
                 lora_node.set_file(file)
 
-                print("[SRC] Enviando métricas...")
+                print("[SRC] Sending metrics...")
                 lora_node.send_file()
-                print("[SRC] Métricas enviadas correctamente")
+                print("[SRC] Metrics sent correctly")
         
         except Exception as e:
-            print("[SRC] Error al enviar métricas:", repr(e))
+            print("[SRC] Error while sending metrics:", repr(e))
             sys.print_exception(e)
             gc.collect()
 
