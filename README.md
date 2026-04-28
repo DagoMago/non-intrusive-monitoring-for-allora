@@ -42,7 +42,7 @@ One of the key changes made to the protocol structure in this project, is the re
 
 - `adapter/` — software to be executed on the LilyGO T3S3 that serves as an adapter for the RP Gateway, so it can access the LoRa channel
 - `AlLoRa/` — the modified AlLoRa code, intended to be used by all the nodes that execute that protocol
-- `brokerMQTT_docker/` — all the configurations —including the docker-compose.yml— for the MQTT broker + TIG stack [consult its readme (/brokerMQTT_docker/README.md)] to be run on a Raspberry Pi node (or any PC)
+- `brokerMQTT_docker/` — all the configurations —including the docker-compose.yml— for the MQTT broker + TIG stack [consult its readme] (brokerMQTT_docker/README.md) to be run on a Raspberry Pi node (or any PC)
 - `controller_i2c/` — software to be executed on the LilyGO T3S3 that serves as a controller node (for a LilyGO sensor node, communicating via the I2C serial protocol)
 - `controller_uart/` — software to be executed on the LilyGO T3S3 that serves as a controller node (for a RP sensor node, communicating via the UART serial protocol)
 - `docs/` — recopilation of all the README.md files of the repository, and other useful documentation related to it
@@ -74,15 +74,17 @@ The example of network architecture designed for this proyect is shown in the su
     <img src="readme_assets/low_level_architecture.png"  width="50%">
 </p>
 
-The MQTT broker can interact with multiple AlLoRa Gateways, and those Gateways have their assigned controller nodes [see Nodes.json (/gateway/Nodes.json)].
+The MQTT broker can interact with multiple AlLoRa Gateways, and those Gateways have their assigned controller nodes [see Nodes.json] (gateway/Nodes.json).
 
 ## Control Circuits
 The simple electric circuits used for allowing the hard-reboot of the terminal nodes are presented in the following diagrams. As their energetical needs differ from one another, the hardware employed in each case (LilyGO sensing node/Raspberry Pi sensing node) varies accordingly. These configurations allow for the main control/supervision function of the project to work.
 
+### Control Circuit for LilyGO sensing nodes
 <p align="center">
     <img src="readme_assets/lilygo_circuit_diagram.png"  width="50%">
 </p>
 
+### Control Circuit for Raspberry Pi sensing nodes
 <p align="center">
     <img src="readme_assets/raspberry_circuit_diagram.png"  width="50%">
 </p>
