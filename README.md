@@ -42,7 +42,7 @@ One of the key changes made to the protocol structure in this project, is the re
 
 - [`adapter/`](adapter/) — software to be executed on the LilyGO T3S3 that serves as an adapter for the RP Gateway, so it can access the LoRa channel
 - [`AlLoRa/`](AlLoRa/) — the modified AlLoRa code, intended to be used by all the nodes that execute that protocol
-- [`brokerMQTT_docker/`](brokerMQTT_docker/) — all the configurations —including the docker-compose.yml— for the MQTT broker + TIG stack [consult its readme](brokerMQTT_docker/) to be run on a Raspberry Pi node (or any PC)
+- [`brokerMQTT_docker/`](brokerMQTT_docker/) — all the configurations —including the docker-compose.yml— for the MQTT broker + TIG stack [[consult its readme]](brokerMQTT_docker/) to be run on a Raspberry Pi node (or any PC)
 - [`controller_i2c/`](controller_i2c/) — software to be executed on the LilyGO T3S3 that serves as a controller node (for a LilyGO sensor node, communicating via the I2C serial protocol)
 - [`controller_uart/`](controller_uart/) — software to be executed on the LilyGO T3S3 that serves as a controller node (for a RP sensor node, communicating via the UART serial protocol)
 - [`docs/`](docs/) — recopilation of all the README.md files of the repository, and other useful documentation related to it
