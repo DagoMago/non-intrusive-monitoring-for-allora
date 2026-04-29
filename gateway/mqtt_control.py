@@ -15,15 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# This class, executed by the AlLoRa Gateway, manages the reception of MQTT messages -control commands- from the MQTT monitoring/control broker, 
+# and puts them accordingly in the control queue
+
 import json
 import time
 import paho.mqtt.client as mqtt
 
 from control import control_queue
 
-MQTT_BROKER = "localhost"
+MQTT_BROKER = "localhost" # We MUST change it if the MQTT Broker is not located in the same machine as the AlLoRa Gateway executing this class
 MQTT_PORT = 1883
-MQTT_TOPIC = "allora/gateway_01/+/control"
+MQTT_TOPIC = "allora/gateway_01/+/control" # MUST be customized for every Gateway in the network architecture
 
 CONTROL_TYPES = {"RESET", "CONN-ACK", "HARD-REBOOT"}
 

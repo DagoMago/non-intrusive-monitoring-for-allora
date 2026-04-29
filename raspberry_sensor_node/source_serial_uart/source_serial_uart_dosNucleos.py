@@ -15,6 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# The program executed by the Raspberry Pi sensing nodes. It generates the metrics periodically, and sends them over UART when the assigned
+# controller asks for them. It also manages the control commands (C-ACK & S-RESET) sent to it by that controller.
+
 #!/usr/bin/env python3
 import os
 import json
@@ -76,13 +79,13 @@ def get_cpu_freq_hz():
             text=True,
             stderr=subprocess.DEVNULL
         ).strip()
-        # formato típico: frequency(48)=1200000000
+        # Typical format: frequency(48)=1200000000
         if "=" in out:
             return int(out.split("=")[1])
     except Exception:
         pass
 
-    # fallback genérico
+    # generic fallback
     try:
         with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r") as f:
             return int(f.read().strip()) * 1000
@@ -108,15 +111,17 @@ def generate_metrics_payload():
         raw = raw[:BUF_SIZE - 1]
     return raw
 
+# The function that periodically generates the metrics of the node
 def update_metrics_loop():
     global active_payload
     while True:
         payload = generate_metrics_payload()
         with payload_lock:
             active_payload = payload
-        print(f"[RPi] Métricas actualizadas, longitud JSON: {len(payload)}")
+        print(f"[RPi] Updated metrics, JSON length: {len(payload)}")
         time.sleep(10)
 
+# The message format includes a synchronization byte (0xAA), the length of the payload, and the payload itself
 def build_frame(payload: bytes) -> bytes:
     length = len(payload)
     header = bytes([0xAA, length & 0xFF, (length >> 8) & 0xFF])
@@ -127,7 +132,7 @@ def do_reboot():
     try:
         subprocess.run(["sudo", "-n", "reboot"], check=True)
     except subprocess.CalledProcessError as e:
-        print("[RPi] Error lanzando reboot:", e)
+        print("[RPi] Error rebooting:", e)
 
 def main():
     global active_payload
@@ -144,8 +149,10 @@ def main():
         stopbits=serial.STOPBITS_ONE
     )
 
-    print(f"[RPi] Escuchando UART en {SERIAL_PORT} @ {BAUDRATE}")
+    print(f"[RPi] Listening UART on {SERIAL_PORT} @ {BAUDRATE}")
 
+    # We create an independent thread for the periodical update of metrics. And the main thread will handle the UART communication and the control
+    # scheme from below
     t = threading.Thread(target=update_metrics_loop, daemon=True)
     t.start()
 
@@ -156,24 +163,25 @@ def main():
 
         cmd_byte = cmd[0]
 
+        # The common metric polling and the control C-ACK command will share this logic
         if cmd_byte == CMD_CONN_ACK:
             with payload_lock:
                 payload = active_payload
             frame = build_frame(payload)
             ser.write(frame)
             ser.flush()
-            print("[RPi] Enviadas métricas por UART")
+            print("[RPi] Metrics sent via UART")
 
         elif cmd_byte == CMD_RESET:
             payload = b"RESET"
             frame = build_frame(payload)
             ser.write(frame)
             ser.flush()
-            print("[RPi] Confirmado RESET por UART")
+            print("[RPi] RESET confirmed via UART")
             threading.Thread(target=do_reboot, daemon=True).start()
 
         else:
-            print(f"[RPi] Comando desconocido: 0x{cmd_byte:02X}")
+            print(f"[RPi] Unknown command: 0x{cmd_byte:02X}")
 
 if __name__ == "__main__":
     main()

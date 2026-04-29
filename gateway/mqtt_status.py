@@ -15,6 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# This class, executed by the AlLoRa Gateway, handles the transmission of the nodes' status via MQTT. Its use can be consulted in the 
+# "control" class.
+
 import json
 import threading
 import paho.mqtt.client as mqtt
@@ -31,7 +34,7 @@ def init_mqtt_status():
         if _client is None:
             client = mqtt.Client()
             client.connect(MQTT_BROKER, MQTT_PORT, 60)
-            client.loop_start()   # hilo interno del cliente MQTT
+            client.loop_start()   # Internal thread of the MQTT client
             _client = client
 
 def publish_json(topic, payload):

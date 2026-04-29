@@ -15,6 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# The class that offers the metrics object for the legacy HTML dashboard on the Gateway, and the corresponding lock for controlling its access.
+# It also provides the analogous objects for the "node_status" (CONNECTED/DISCONNECTED/PENDING) which are also used in that previous dashboard.
+
 from threading import Lock
 
 metrics = {}

@@ -15,6 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# This class, executed by the AlLoRa Gateway, handles the reception of the control commands launched from the legacy HTML Dashboard, and
+# publishes them on the control queue. It also provides that Dashboard with the metrics and other data needed.
+
 from flask import Flask, render_template, redirect
 from gateway_state import metrics, metrics_lock, node_status, node_status_lock
 from control import control_queue

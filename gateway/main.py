@@ -21,6 +21,11 @@
 # Original work Copyright (C) Benjamin Arratia and contributors
 # Modifications Copyright (C) 2026 Diego Rios Gomez
 
+# Main class to be executed by the AlLoRa Gateways. It comprises multiple threads: the one for the polling of the controlling nodes, the one 
+# managing the control queue, the thread that executes the web server (for the HTML Dashboard - refer to this directory's README for details),
+# the one in charge of the MQTT messages received (control commands), and an extra one for keeping the Gateway running. There's also the
+# initialization of the MQTT Client's internal thread, which sets it ready for sending the "Node Status" messages over MQTT when needed.
+
 import RPi.GPIO as GPIO
 import time
 import  sys, gc
@@ -64,35 +69,32 @@ if __name__ == "__main__":
     connector = Serial_connector(reset_function=reset_esp32)
     lora_gateway = Gateway(connector, config_file= config_file, debug_hops= False)
     
-    #PRUEBA: 3 hilos de ejecución en la RP4: la toma de métricas (check digital endpoints), la cola de control (para los reset),
-    #y el servidor web con la visualización de dichas métricas y el botón de reset
-    
     lora_gateway.metrics = metrics
     lora_gateway.metrics_lock = metrics_lock
     
-    
-    #1 - Métricas clientes
+
+    #1 - Clients' metrics
     Thread(
         target=lora_gateway.check_digital_endpoints,
         kwargs={"print_file_content": False, "save_files": False},
         daemon=True
     ).start()
     
-    #2 - Cola de control
+    #2 - Control Queue
     Thread(
         target=control_loop,
         args=(lora_gateway, control_queue),
         daemon=True
     ).start()
     
-    #3 - Servidor Web
+    #3 - Web Server ("Dashboard")
     Thread(
         target=app.run,
         kwargs={"host": "0.0.0.0", "port": 8080},
         daemon=True
     ).start()
 
-    #4 - Gestión MQTT RX
+    #4 - MQTT RX Management
     Thread(
         target=mqtt_control_loop,
         daemon=True
@@ -100,6 +102,6 @@ if __name__ == "__main__":
 
     init_mqtt_status()
     
-    # Mantener vivo el proceso
+    # We keep alive the process
     while True:
         sleep(1)

@@ -17,6 +17,11 @@
   along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+ /*
+  The program executed by the LilyGO T3S3 sensing nodes. It generates the metrics periodically, and sends them over I2C when the assigned
+  controller reads this channel. It also manages the control commands (C-ACK & S-RESET) sent to it by that controller.
+ */
+
 // source_serial_i2c_dosNucleos.ino
 #include <Wire.h>
 #include "esp_heap_caps.h"
@@ -51,12 +56,12 @@ void generate_metrics_response(){
   char* write_buf;
   uint16_t local_len = 0;
 
-  // Elegir el buffer que no está activo
+  // We choose the non-active buffer
   portENTER_CRITICAL(&mux);
   write_buf = (active_buf == bufA) ? bufB : bufA;
   portEXIT_CRITICAL(&mux);
 
-  // Preparar métricas en buffer no activo
+  // We prepare the metrics in the non-active buffer
   size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
   size_t total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
   size_t used_heap  = total_heap - free_heap;
@@ -79,7 +84,7 @@ void generate_metrics_response(){
     if (err == ESP_OK) {
       temp_ok = true;
     } else {
-      Serial.printf("Error leyendo temperatura interna: %d\n", err);
+      Serial.printf("Error reading internal temperature: %d\n", err);
     }
   }
 
@@ -106,11 +111,11 @@ void generate_metrics_response(){
   if (local_len < 0) local_len = 0;
   if (local_len >= BUF_SIZE) local_len = BUF_SIZE - 1;
 
-  Serial.print("Longitud JSON: ");
+  Serial.print("JSON length: ");
   Serial.println(local_len);
 
-  // Swap atómico (sección crítica muy corta): solo actualizamos la longitud "global" y cambiamos el puntero del buffer activo al nuevo 
-  //(más rápido que hacer memcpy, minimizar el bloquear al otro core con el lock)
+  // Atomic swap (very short critical section): we only update the "global" length and we change the pointer from the active buffer to the new one
+  //(faster than to do a memcpy, so we minimize blocking the other core with the lock)
   portENTER_CRITICAL(&mux);
   active_buf = write_buf;
   active_len = local_len;
@@ -121,7 +126,7 @@ void metricsTask(void *pvParameters) {
   for(;;) {
     generate_metrics_response();
     
-    // Espera 10s o hasta que alguien lo despierte
+    // Waits for 10s or until it's waken up by the other core
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10000));
   }
 }
@@ -130,7 +135,7 @@ void prepare_simple_response(const char* msg) {
   char* write_buf;
   uint16_t len = 0;
 
-  //Escoger buffer inactivo
+  //We choose the inactive buffer
   portENTER_CRITICAL(&mux);
   write_buf = (active_buf == bufA) ? bufB : bufA;
   portEXIT_CRITICAL(&mux);
@@ -146,6 +151,7 @@ void prepare_simple_response(const char* msg) {
   portEXIT_CRITICAL(&mux);
 }
 
+//The event that is triggered when the controller node sends a control command over the I2C serial connection
 void receiveEvent(int howMany) {
   if (Wire.available()) {
     last_command = Wire.read();
@@ -153,15 +159,17 @@ void receiveEvent(int howMany) {
   while (Wire.available()) Wire.read();
 }
 
+//The event that is triggered when the controller node reads the I2C channel (so in this function we write the metrics message in it)
 void requestEvent() {
   char* buf;
   uint16_t len = 0;
 
-  //Ahora hay que evitar condición de carrera al acceder tanto al buffer como a la variable, al ser usados por ambos cores
+  //We have to avoid the race condition when accessing both the buffer and the length variable, because they are used by both cores
   portENTER_CRITICAL_ISR(&mux);
   len = active_len;
   buf = (char*)active_buf;
 
+  //The message format includes a synchronization byte (0xAA), the length of the payload, and the payload itself
   uint8_t header[3];
   header[0] = 0xAA;
   header[1] = len & 0xFF;
@@ -176,7 +184,7 @@ void requestEvent() {
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println("Iniciando I2C slave...");
+  Serial.println("Initializing I2C slave...");
 
   for (int i=0; i<5; ++i) {
   Serial.println("Boot message");
@@ -192,12 +200,13 @@ void setup() {
   
     if (err == ESP_OK) {
       temp_sensor_ready = true;
-      Serial.println("Sensor de temperatura interna OK");
+      Serial.println("Internal Temperature sensor OK");
     } else {
       temp_sensor_ready = false;
-      Serial.printf("Error iniciando sensor de temperatura: %d\n", err);
+      Serial.printf("Error initializing Internal Temperature sensor: %d\n", err);
     }
 
+  //We create an additional task, which will be executed by Core 1, consisting in the periodical (every 10s) generation of metrics
   xTaskCreatePinnedToCore(
     metricsTask,
     "MetricsTask",
@@ -208,7 +217,7 @@ void setup() {
     1  // Core 1
   );
 
-  Serial.println("Gestión I2C: Core 0; Generación periódica de métricas (cada 10s): Core 1");
+  Serial.println("Management of the I2C connection: Core 0; Periodical generation of metrics (every 10s): Core 1");
 
 
   Wire.setPins(15,16);
@@ -219,9 +228,10 @@ void setup() {
   Wire.onRequest(requestEvent);
 
   //prepare_metrics();
-  Serial.println("I2C slave listo");
+  Serial.println("I2C slave ready");
 }
 
+//The control loop of the program, as well as the handling of the receive and request events, is managed by the main core
 void loop() {
   if (last_command != 0) {
 

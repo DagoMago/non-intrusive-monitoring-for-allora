@@ -15,6 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# This class handles the "control queue" of control commands to be sent. Executed by the Gateway, it monitors it and runs the corresponding
+# control functions upon detecting the messages in the queue.
+
 from queue import Queue
 from gateway_state import node_status, node_status_lock
 from datetime import datetime
@@ -24,7 +27,7 @@ control_queue = Queue()
 
 def control_loop(gateway, control_queue):
     while True:
-        cmd = control_queue.get()   # bloquea sin CPU
+        cmd = control_queue.get()
 
         if cmd["type"] == "RESET":
             mac = cmd["mac"]
@@ -34,7 +37,8 @@ def control_loop(gateway, control_queue):
         if cmd["type"] == "CONN-ACK":
             mac = cmd["mac"]
             controlled_node_mac = cmd["controlled_node_mac"]
-
+            
+            # This states are published in a MQTT topic that feeds the "Status" panel in Grafana
             publish_node_status(
                         controlled_node_mac=controlled_node_mac,
                         state="PENDING",
@@ -52,6 +56,7 @@ def control_loop(gateway, control_queue):
                         "message": "Conexión establecida"
                     }
 
+                    # This states are published in a MQTT topic that feeds the "Status" panel in Grafana
                     publish_node_status(
                         controlled_node_mac=controlled_node_mac,
                         state="CONNECTED",
@@ -67,6 +72,7 @@ def control_loop(gateway, control_queue):
                         "message": "Sin conexión"
                     }
 
+                    # This states are published in a MQTT topic that feeds the "Status" panel in Grafana
                     publish_node_status(
                         controlled_node_mac=controlled_node_mac,
                         state="DISCONNECTED",
